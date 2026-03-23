@@ -8,11 +8,20 @@ from flask import current_app
 
 
 class AIAssistant:
-    """Service class for OpenAI operations."""
+    """Service class for OpenAI operations. Supports OpenAI API and OpenAI-compatible local models (Ollama, LM Studio, etc.)."""
 
     def __init__(self):
-        self.client = OpenAI(api_key=os.environ.get('OPENAI_API_KEY'))
+        api_key = os.environ.get('OPENAI_API_KEY', 'not-needed-for-local')
+        base_url = os.environ.get('OPENAI_BASE_URL')
+        
+        # Initialize client with optional custom base URL for local models
+        if base_url:
+            self.client = OpenAI(api_key=api_key, base_url=base_url)
+        else:
+            self.client = OpenAI(api_key=api_key)
+        
         self.model = os.environ.get('OPENAI_MODEL', 'gpt-4-turbo-preview')
+        self.supports_json_mode = os.environ.get('OPENAI_SUPPORTS_JSON_MODE', 'true').lower() == 'true'
 
     def _get_system_prompt(self, prompt_type: str) -> str:
         """Get system prompt for different AI tasks."""
@@ -34,23 +43,28 @@ class AIAssistant:
             - category: one of [hardware, software, network, security, email, other]
             - priority: one of [critical, high, medium, low]
             - suggested_assignee_type: type of specialist needed
-            - related_keywords: list of relevant keywords""",
+            - related_keywords: list of relevant keywords
+            
+            Return ONLY valid JSON, no markdown formatting.""",
 
             'lead_scoring': """Analyze the lead and return a score (0-100) based on:
             - Company fit
             - Engagement level
             - Budget indicators
             - Timeline
-            Return JSON with score, confidence, and reasoning.""",
+            Return JSON with score, confidence, and reasoning.
+            Return ONLY valid JSON, no markdown formatting.""",
 
             'opportunity_analysis': """Analyze the opportunity and provide insights on:
             - Win probability
             - Key risks
             - Recommended next steps
-            - Competitive positioning""",
+            - Competitive positioning
+            Return ONLY valid JSON, no markdown formatting.""",
 
             'workflow_suggestion': """Analyze patterns and suggest workflow automations.
-            Return JSON array of workflow suggestions with trigger, conditions, and actions.""",
+            Return JSON array of workflow suggestions with trigger, conditions, and actions.
+            Return ONLY valid JSON, no markdown formatting.""",
 
             'content_generation': """Generate professional business content based on the specified type.
             Be clear, concise, and appropriate for business communication.""",
@@ -59,9 +73,41 @@ class AIAssistant:
             - Entity types to search (tickets, clients, projects, etc.)
             - Filter conditions
             - Sort preferences
-            Return structured search parameters."""
+            Return structured search parameters as JSON.
+            Return ONLY valid JSON, no markdown formatting."""
         }
         return prompts.get(prompt_type, prompts['assistant'])
+
+    def _create_chat_completion(self, messages: List[Dict], max_tokens: int = 1000, 
+                               temperature: float = 0.7, json_mode: bool = False) -> Any:
+        """Create chat completion with support for models that don't have JSON mode."""
+        kwargs = {
+            'model': self.model,
+            'messages': messages,
+            'max_tokens': max_tokens,
+            'temperature': temperature
+        }
+        
+        # Only use response_format if the model supports it
+        if json_mode and self.supports_json_mode:
+            kwargs['response_format'] = {'type': 'json_object'}
+        
+        return self.client.chat.completions.create(**kwargs)
+
+    def _parse_json_response(self, response_text: str) -> Dict:
+        """Parse JSON from response, handling markdown code blocks."""
+        text = response_text.strip()
+        
+        # Remove markdown code blocks if present
+        if text.startswith('```json'):
+            text = text[7:]
+        elif text.startswith('```'):
+            text = text[3:]
+        if text.endswith('```'):
+            text = text[:-3]
+        
+        text = text.strip()
+        return json.loads(text)
 
     def chat(self, user_id: int, organization_id: int, message: str, context: Dict = None) -> str:
         """Chat with AI assistant."""
@@ -79,8 +125,7 @@ class AIAssistant:
 
         messages.append({"role": "user", "content": message})
 
-        response = self.client.chat.completions.create(
-            model=self.model,
+        response = self._create_chat_completion(
             messages=messages,
             max_tokens=1000,
             temperature=0.7
@@ -102,8 +147,7 @@ class AIAssistant:
         for comment in ticket.comments.limit(5):
             ticket_context += f"\n- {comment.content[:200]}"
 
-        response = self.client.chat.completions.create(
-            model=self.model,
+        response = self._create_chat_completion(
             messages=[
                 {"role": "system", "content": self._get_system_prompt('ticket_response')},
                 {"role": "user", "content": f"Generate a response to this ticket:\n{ticket_context}"}
@@ -116,18 +160,17 @@ class AIAssistant:
 
     def categorize_ticket(self, ticket) -> Dict:
         """Categorize and analyze a ticket."""
-        response = self.client.chat.completions.create(
-            model=self.model,
+        response = self._create_chat_completion(
             messages=[
                 {"role": "system", "content": self._get_system_prompt('ticket_categorization')},
                 {"role": "user", "content": f"Categorize this ticket:\nSubject: {ticket.subject}\nDescription: {ticket.description}"}
             ],
             max_tokens=200,
             temperature=0.3,
-            response_format={"type": "json_object"}
+            json_mode=True
         )
 
-        return json.loads(response.choices[0].message.content)
+        return self._parse_json_response(response.choices[0].message.content)
 
     def recommend_assignee(self, ticket) -> Dict:
         """Recommend best assignee for a ticket."""
@@ -149,8 +192,7 @@ class AIAssistant:
                 'open_tickets': open_tickets
             }
 
-        response = self.client.chat.completions.create(
-            model=self.model,
+        response = self._create_chat_completion(
             messages=[
                 {"role": "system", "content": """Analyze the ticket and recommend the best assignee based on:
                 - Skills match (category, type)
@@ -159,7 +201,8 @@ class AIAssistant:
 
                 Return JSON with:
                 - recommendations: list of {user_id, name, score, reasoning}
-                - estimated_resolution_time: hours"""},
+                - estimated_resolution_time: hours
+                Return ONLY valid JSON, no markdown formatting."""},
                 {"role": "user", "content": f"""
                 Ticket: {ticket.subject}
                 Category: {ticket.category}
@@ -172,10 +215,10 @@ class AIAssistant:
             ],
             max_tokens=500,
             temperature=0.3,
-            response_format={"type": "json_object"}
+            json_mode=True
         )
 
-        return json.loads(response.choices[0].message.content)
+        return self._parse_json_response(response.choices[0].message.content)
 
     def generate_dashboard_summary(self, organization_id: int) -> Dict:
         """Generate AI summary of dashboard data."""
@@ -213,8 +256,7 @@ class AIAssistant:
         - Active Projects: {active_projects}
         """
 
-        response = self.client.chat.completions.create(
-            model=self.model,
+        response = self._create_chat_completion(
             messages=[
                 {"role": "system", "content": "Provide a brief executive summary with key insights and recommendations."},
                 {"role": "user", "content": summary_text}
@@ -236,21 +278,17 @@ class AIAssistant:
 
     def generate_insights(self, organization_id: int, start_date: str, end_date: str) -> Dict:
         """Generate AI insights from business data."""
-        # This would gather various metrics and analyze them
-        # For now, return a structured response
-
-        response = self.client.chat.completions.create(
-            model=self.model,
+        response = self._create_chat_completion(
             messages=[
-                {"role": "system", "content": "Analyze business metrics and provide insights with recommendations."},
+                {"role": "system", "content": "Analyze business metrics and provide insights with recommendations. Return ONLY valid JSON, no markdown formatting.""},
                 {"role": "user", "content": f"Generate insights for organization {organization_id} from {start_date} to {end_date}"}
             ],
             max_tokens=500,
             temperature=0.5,
-            response_format={"type": "json_object"}
+            json_mode=True
         )
 
-        return json.loads(response.choices[0].message.content)
+        return self._parse_json_response(response.choices[0].message.content)
 
     def score_lead(self, lead) -> Dict:
         """Score a lead using AI."""
@@ -264,18 +302,17 @@ class AIAssistant:
         - Status: {lead.status}
         """
 
-        response = self.client.chat.completions.create(
-            model=self.model,
+        response = self._create_chat_completion(
             messages=[
                 {"role": "system", "content": self._get_system_prompt('lead_scoring')},
                 {"role": "user", "content": f"Score this lead:\n{lead_context}"}
             ],
             max_tokens=300,
             temperature=0.3,
-            response_format={"type": "json_object"}
+            json_mode=True
         )
 
-        return json.loads(response.choices[0].message.content)
+        return self._parse_json_response(response.choices[0].message.content)
 
     def analyze_opportunity(self, opportunity) -> Dict:
         """Analyze an opportunity for win probability."""
@@ -288,33 +325,31 @@ class AIAssistant:
         Type: {opportunity.opportunity_type}
         """
 
-        response = self.client.chat.completions.create(
-            model=self.model,
+        response = self._create_chat_completion(
             messages=[
                 {"role": "system", "content": self._get_system_prompt('opportunity_analysis')},
                 {"role": "user", "content": f"Analyze this opportunity:\n{opp_context}"}
             ],
             max_tokens=400,
             temperature=0.3,
-            response_format={"type": "json_object"}
+            json_mode=True
         )
 
-        return json.loads(response.choices[0].message.content)
+        return self._parse_json_response(response.choices[0].message.content)
 
     def suggest_workflows(self, organization_id: int, entity_type: str) -> List[Dict]:
         """Suggest workflow automations based on patterns."""
-        response = self.client.chat.completions.create(
-            model=self.model,
+        response = self._create_chat_completion(
             messages=[
                 {"role": "system", "content": self._get_system_prompt('workflow_suggestion')},
                 {"role": "user", "content": f"Suggest workflows for {entity_type} management in a PSA platform"}
             ],
             max_tokens=500,
             temperature=0.5,
-            response_format={"type": "json_object"}
+            json_mode=True
         )
 
-        result = json.loads(response.choices[0].message.content)
+        result = self._parse_json_response(response.choices[0].message.content)
         return result.get('suggestions', [])
 
     def generate_content(self, content_type: str, context: Dict) -> str:
@@ -330,8 +365,7 @@ class AIAssistant:
 
         context_str = json.dumps(context, indent=2)
 
-        response = self.client.chat.completions.create(
-            model=self.model,
+        response = self._create_chat_completion(
             messages=[
                 {"role": "system", "content": f"{system_prompt}\n{self._get_system_prompt('content_generation')}"},
                 {"role": "user", "content": f"Context:\n{context_str}"}
@@ -344,15 +378,14 @@ class AIAssistant:
 
     def natural_language_search(self, organization_id: int, query: str) -> Dict:
         """Parse natural language search query."""
-        response = self.client.chat.completions.create(
-            model=self.model,
+        response = self._create_chat_completion(
             messages=[
                 {"role": "system", "content": self._get_system_prompt('search')},
                 {"role": "user", "content": f"Parse this search query: {query}"}
             ],
             max_tokens=300,
             temperature=0.2,
-            response_format={"type": "json_object"}
+            json_mode=True
         )
 
-        return json.loads(response.choices[0].message.content)
+        return self._parse_json_response(response.choices[0].message.content)
