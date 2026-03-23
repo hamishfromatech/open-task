@@ -1,0 +1,243 @@
+{% extends "base.html" %}
+
+{% block title %}Integrations - {{ app_name }}{% endblock %}
+
+{% block content %}
+<div class="space-y-6">
+    <!-- Page Header -->
+    <div class="flex items-center justify-between">
+        <div>
+            <h1 class="text-2xl font-bold text-gray-900">Integrations</h1>
+            <p class="mt-1 text-sm text-gray-500">Connect your favorite tools and automate workflows</p>
+        </div>
+        <div class="flex items-center space-x-3">
+            <span class="px-3 py-1 text-sm font-medium rounded-full
+                {% if composio_configured %}bg-green-100 text-green-800{% else %}bg-red-100 text-red-800{% endif %}">
+                {% if composio_configured %}
+                <i class="fas fa-check-circle mr-1"></i> Composio Connected
+                {% else %}
+                <i class="fas fa-exclamation-circle mr-1"></i> Not Connected
+                {% endif %}
+            </span>
+        </div>
+    </div>
+
+    {% if not composio_configured %}
+    <!-- Configuration Warning -->
+    <div class="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+        <div class="flex items-start">
+            <div class="flex-shrink-0">
+                <i class="fas fa-exclamation-triangle text-yellow-400 text-xl"></i>
+            </div>
+            <div class="ml-3">
+                <h3 class="text-sm font-medium text-yellow-800">Composio API Key Required</h3>
+                <div class="mt-2 text-sm text-yellow-700">
+                    <p>To enable integrations, set your <code class="bg-yellow-100 px-1 rounded">COMPOSIO_API_KEY</code> environment variable.</p>
+                    <ol class="mt-2 list-decimal list-inside space-y-1">
+                        <li>Get your API key from <a href="https://composio.dev" target="_blank" class="underline">composio.dev</a></li>
+                        <li>Add it to your <code class="bg-yellow-100 px-1 rounded">.env</code> file</li>
+                        <li>Restart the application</li>
+                    </ol>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Connected Integrations -->
+    {% if connected_accounts %}
+    <div class="bg-white rounded-lg border border-gray-200">
+        <div class="px-6 py-4 border-b border-gray-200">
+            <h2 class="text-lg font-semibold text-gray-900">Your Connected Apps</h2>
+            <p class="text-sm text-gray-500">Apps you've connected to your account</p>
+        </div>
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 p-6">
+            {% for account in connected_accounts %}
+            <div class="flex items-center justify-between p-4 border border-gray-200 rounded-lg hover:border-primary-500 hover:shadow-sm transition-colors">
+                <div class="flex items-center space-x-3">
+                    <div class="w-10 h-10 bg-gray-100 rounded-lg flex items-center justify-center">
+                        <i class="fas fa-plug text-gray-600"></i>
+                    </div>
+                    <div>
+                        <h3 class="text-sm font-medium text-gray-900">{{ account.integration.name }}</h3>
+                        <p class="text-xs text-gray-500">Connected {{ account.created_at|date }}</p>
+                    </div>
+                </div>
+                <div class="flex items-center space-x-2">
+                    <span class="px-2 py-1 text-xs font-medium rounded-full
+                        {% if account.status == 'active' %}bg-green-100 text-green-800{% endif %}
+                        {% if account.status == 'expired' %}bg-yellow-100 text-yellow-800{% endif %}
+                        {% if account.status == 'revoked' %}bg-red-100 text-red-800{% endif %}">
+                        {{ account.status|title }}
+                    </span>
+                    <a href="{{ url_for('integrations.details', account_id=account.id) }}"
+                       class="text-primary-600 hover:text-primary-700">
+                        <i class="fas fa-cog"></i>
+                    </a>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Available Integrations -->
+    <div class="bg-white rounded-lg border border-gray-200">
+        <div class="px-6 py-4 border-b border-gray-200 flex items-center justify-between">
+            <div>
+                <h2 class="text-lg font-semibold text-gray-900">Available Apps</h2>
+                <p class="text-sm text-gray-500">{{ available_integrations|length }}+ apps available via Composio</p>
+            </div>
+            <div class="flex items-center space-x-2">
+                <input type="text" id="searchApps" placeholder="Search apps..."
+                       class="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"
+                       onkeyup="filterApps()">
+                <select id="categoryFilter" onchange="filterApps()"
+                        class="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500">
+                    <option value="">All Categories</option>
+                    <option value="Communication">Communication</option>
+                    <option value="CRM">CRM</option>
+                    <option value="Development">Development</option>
+                    <option value="Productivity">Productivity</option>
+                    <option value="Support">Support</option>
+                    <option value="Marketing">Marketing</option>
+                    <option value="Sales">Sales</option>
+                    <option value="Finance">Finance</option>
+                    <option value="Other">Other</option>
+                </select>
+            </div>
+        </div>
+
+        {% if available_integrations %}
+        <div id="appsGrid" class="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4 p-6">
+            {% for integration in available_integrations %}
+            <div class="app-card p-4 border border-gray-200 rounded-lg hover:border-primary-500 hover:shadow-md transition-all cursor-pointer"
+                 data-category="{{ integration.category }}"
+                 data-name="{{ integration.name|lower }}"
+                 onclick="window.location='{{ url_for('integrations.connect', toolkit_slug=integration.slug) }}'">
+                <div class="flex flex-col items-center text-center">
+                    <div class="w-12 h-12 bg-gray-100 rounded-lg flex items-center justify-center mb-3">
+                        <i class="fas fa-puzzle-piece text-gray-600 text-xl"></i>
+                    </div>
+                    <h3 class="text-sm font-medium text-gray-900 truncate w-full">{{ integration.name }}</h3>
+                    <p class="text-xs text-gray-500 mt-1">{{ integration.category }}</p>
+                    {% if integration.auth_schemes %}
+                    <div class="mt-2 flex flex-wrap justify-center gap-1">
+                        {% for scheme in integration.auth_schemes[:2] %}
+                        <span class="px-1.5 py-0.5 text-xs bg-gray-100 rounded">{{ scheme }}</span>
+                        {% endfor %}
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+        {% else %}
+        <div class="p-12 text-center">
+            {% if composio_configured %}
+            <i class="fas fa-search text-4xl text-gray-300 mb-4"></i>
+            <p class="text-gray-500">Loading available integrations...</p>
+            {% else %}
+            <i class="fas fa-plug text-4xl text-gray-300 mb-4"></i>
+            <p class="text-gray-500">Configure Composio to see available integrations</p>
+            {% endif %}
+        </div>
+        {% endif %}
+    </div>
+
+    <!-- How It Works -->
+    <div class="bg-white rounded-lg border border-gray-200 p-6">
+        <h2 class="text-lg font-semibold text-gray-900 mb-4">How Integrations Work</h2>
+        <div class="grid md:grid-cols-4 gap-6">
+            <div class="text-center">
+                <div class="w-12 h-12 bg-primary-100 rounded-lg flex items-center justify-center mx-auto mb-3">
+                    <span class="text-primary-600 font-bold text-lg">1</span>
+                </div>
+                <h3 class="text-sm font-medium text-gray-900">Choose App</h3>
+                <p class="text-xs text-gray-500 mt-1">Select from 850+ available integrations</p>
+            </div>
+            <div class="text-center">
+                <div class="w-12 h-12 bg-primary-100 rounded-lg flex items-center justify-center mx-auto mb-3">
+                    <span class="text-primary-600 font-bold text-lg">2</span>
+                </div>
+                <h3 class="text-sm font-medium text-gray-900">Connect</h3>
+                <p class="text-xs text-gray-500 mt-1">Authorize with OAuth or API key</p>
+            </div>
+            <div class="text-center">
+                <div class="w-12 h-12 bg-primary-100 rounded-lg flex items-center justify-center mx-auto mb-3">
+                    <span class="text-primary-600 font-bold text-lg">3</span>
+                </div>
+                <h3 class="text-sm font-medium text-gray-900">Set Triggers</h3>
+                <p class="text-xs text-gray-500 mt-1">Configure alerts and notifications</p>
+            </div>
+            <div class="text-center">
+                <div class="w-12 h-12 bg-primary-100 rounded-lg flex items-center justify-center mx-auto mb-3">
+                    <span class="text-primary-600 font-bold text-lg">4</span>
+                </div>
+                <h3 class="text-sm font-medium text-gray-900">Automate</h3>
+                <p class="text-xs text-gray-500 mt-1">Let workflows run automatically</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Triggers Setup -->
+    {% if composio_configured %}
+    <div class="bg-white rounded-lg border border-gray-200">
+        <div class="px-6 py-4 border-b border-gray-200 flex items-center justify-between">
+            <div>
+                <h2 class="text-lg font-semibold text-gray-900">Notification Triggers</h2>
+                <p class="text-sm text-gray-500">Get alerts when important events happen</p>
+            </div>
+            <a href="{{ url_for('admin.notification_rules') }}" class="text-sm text-primary-600 hover:text-primary-700 font-medium">
+                Manage Rules <i class="fas fa-arrow-right ml-1"></i>
+            </a>
+        </div>
+        <div class="p-6">
+            <p class="text-sm text-gray-600 mb-4">
+                Set up automatic notifications to Slack, Microsoft Teams, Email, or other channels when:
+            </p>
+            <div class="grid md:grid-cols-2 gap-4">
+                <div class="flex items-center space-x-3 p-3 bg-gray-50 rounded-lg">
+                    <i class="fas fa-ticket-alt text-red-500"></i>
+                    <span class="text-sm text-gray-700">New critical priority ticket created</span>
+                </div>
+                <div class="flex items-center space-x-3 p-3 bg-gray-50 rounded-lg">
+                    <i class="fas fa-clock text-yellow-500"></i>
+                    <span class="text-sm text-gray-700">SLA breach warning</span>
+                </div>
+                <div class="flex items-center space-x-3 p-3 bg-gray-50 rounded-lg">
+                    <i class="fas fa-handshake text-green-500"></i>
+                    <span class="text-sm text-gray-700">Opportunity won or lost</span>
+                </div>
+                <div class="flex items-center space-x-3 p-3 bg-gray-50 rounded-lg">
+                    <i class="fas fa-file-invoice text-blue-500"></i>
+                    <span class="text-sm text-gray-700">Invoice payment received</span>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+</div>
+
+<script>
+function filterApps() {
+    const search = document.getElementById('searchApps').value.toLowerCase();
+    const category = document.getElementById('categoryFilter').value;
+    const cards = document.querySelectorAll('.app-card');
+
+    cards.forEach(card => {
+        const name = card.getAttribute('data-name');
+        const cat = card.getAttribute('data-category');
+
+        const matchesSearch = name.includes(search);
+        const matchesCategory = !category || cat === category;
+
+        if (matchesSearch && matchesCategory) {
+            card.style.display = '';
+        } else {
+            card.style.display = 'none';
+        }
+    });
+}
+</script>
+{% endblock %}

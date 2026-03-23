@@ -1,0 +1,23 @@
+{
+  "name": "taskflow-psa",
+  "version": "1.0.0",
+  "description": "Professional Services Automation Platform",
+  "main": "run.py",
+  "scripts": {
+    "start": "python run.py",
+    "init-db": "python init_db.py",
+    "test": "pytest",
+    "lint": "flake8 app/"
+  },
+  "keywords": [
+    "psa",
+    "professional-services",
+    "ticketing",
+    "crm",
+    "project-management",
+    "flask"
+  ],
+  "author": "",
+  "license": "MIT",
+  "dependencies": {}
+}

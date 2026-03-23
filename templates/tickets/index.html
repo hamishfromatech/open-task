@@ -1,0 +1,191 @@
+{% extends "base.html" %}
+
+{% block title %}Tickets{% endblock %}
+
+{% block content %}
+<div class="space-y-6">
+    <!-- Page Header -->
+    <div class="flex items-center justify-between">
+        <div>
+            <h1 class="text-2xl font-bold text-gray-900">Tickets</h1>
+            <p class="mt-1 text-sm text-gray-500">Manage and track support requests</p>
+        </div>
+        <a href="{{ url_for('tickets.create') }}" class="inline-flex items-center px-4 py-2 bg-primary-600 text-white text-sm font-medium rounded-lg hover:bg-primary-700 transition-colors">
+            <i class="fas fa-plus mr-2"></i>
+            New Ticket
+        </a>
+    </div>
+
+    <!-- Filters -->
+    <div class="bg-white rounded-lg border border-gray-200 p-4">
+        <form method="GET" class="flex flex-wrap items-center gap-4">
+            <div class="flex-1 min-w-64">
+                <input type="text" name="search" value="{{ request.args.get('search', '') }}"
+                       placeholder="Search tickets..."
+                       class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent">
+            </div>
+            <select name="status" class="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500">
+                <option value="">All Statuses</option>
+                <option value="open" {% if request.args.get('status') == 'open' %}selected{% endif %}>Open</option>
+                <option value="in_progress" {% if request.args.get('status') == 'in_progress' %}selected{% endif %}>In Progress</option>
+                <option value="pending" {% if request.args.get('status') == 'pending' %}selected{% endif %}>Pending</option>
+                <option value="resolved" {% if request.args.get('status') == 'resolved' %}selected{% endif %}>Resolved</option>
+                <option value="closed" {% if request.args.get('status') == 'closed' %}selected{% endif %}>Closed</option>
+            </select>
+            <select name="priority" class="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500">
+                <option value="">All Priorities</option>
+                <option value="critical" {% if request.args.get('priority') == 'critical' %}selected{% endif %}>Critical</option>
+                <option value="high" {% if request.args.get('priority') == 'high' %}selected{% endif %}>High</option>
+                <option value="medium" {% if request.args.get('priority') == 'medium' %}selected{% endif %}>Medium</option>
+                <option value="low" {% if request.args.get('priority') == 'low' %}selected{% endif %}>Low</option>
+            </select>
+            <button type="submit" class="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors">
+                <i class="fas fa-filter mr-2"></i>Filter
+            </button>
+            <a href="{{ url_for('tickets.index') }}" class="text-sm text-primary-600 hover:text-primary-700">
+                Clear filters
+            </a>
+        </form>
+    </div>
+
+    <!-- Tickets Table -->
+    <div class="bg-white rounded-lg border border-gray-200 overflow-hidden">
+        <div class="overflow-x-auto">
+            <table class="min-w-full divide-y divide-gray-200">
+                <thead class="bg-gray-50">
+                    <tr>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Ticket</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Client</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Priority</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Assignee</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Created</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">SLA</th>
+                    </tr>
+                </thead>
+                <tbody class="bg-white divide-y divide-gray-200">
+                    {% for ticket in tickets.items %}
+                    <tr class="hover:bg-gray-50 cursor-pointer" onclick="window.location='{{ url_for('tickets.view', ticket_id=ticket.id) }}'">
+                        <td class="px-6 py-4">
+                            <div class="flex items-center space-x-3">
+                                <input type="checkbox" class="h-4 w-4 text-primary-600 focus:ring-primary-500 border-gray-300 rounded">
+                                <div>
+                                    <div class="flex items-center space-x-2">
+                                        <span class="text-xs font-mono text-gray-500">{{ ticket.ticket_number }}</span>
+                                        <span class="px-2 py-0.5 text-xs font-medium rounded
+                                            {% if ticket.ticket_type == 'incident' %}bg-red-100 text-red-800{% endif %}
+                                            {% if ticket.ticket_type == 'request' %}bg-blue-100 text-blue-800{% endif %}
+                                            {% if ticket.ticket_type == 'change' %}bg-purple-100 text-purple-800{% endif %}
+                                            {% if ticket.ticket_type == 'problem' %}bg-orange-100 text-orange-800{% endif %}">
+                                            {{ ticket.ticket_type }}
+                                        </span>
+                                    </div>
+                                    <div class="text-sm font-medium text-gray-900">{{ ticket.subject }}</div>
+                                </div>
+                            </div>
+                        </td>
+                        <td class="px-6 py-4">
+                            <div class="text-sm text-gray-900">{{ ticket.client.name if ticket.client else '-' }}</div>
+                        </td>
+                        <td class="px-6 py-4">
+                            <span class="px-2 py-1 text-xs font-medium rounded-full {{ ticket.status|status_badge }}">
+                                {{ ticket.status|title }}
+                            </span>
+                        </td>
+                        <td class="px-6 py-4">
+                            <span class="px-2 py-1 text-xs font-medium rounded-full border {{ ticket.priority|priority_badge }}">
+                                {{ ticket.priority|title }}
+                            </span>
+                        </td>
+                        <td class="px-6 py-4">
+                            <div class="text-sm text-gray-900">
+                                {% if ticket.assignee %}
+                                <div class="flex items-center space-x-2">
+                                    <div class="w-6 h-6 bg-primary-600 rounded-full flex items-center justify-center">
+                                        <span class="text-white text-xs">{{ ticket.assignee.initials }}</span>
+                                    </div>
+                                    <span>{{ ticket.assignee.full_name }}</span>
+                                </div>
+                                {% else %}
+                                <span class="text-gray-400">Unassigned</span>
+                                {% endif %}
+                            </div>
+                        </td>
+                        <td class="px-6 py-4 text-sm text-gray-500">
+                            {{ ticket.created_at|datetime }}
+                        </td>
+                        <td class="px-6 py-4">
+                            {% if ticket.sla_due_at %}
+                            <div class="flex items-center space-x-1">
+                                {% if ticket.sla_status == 'breached' %}
+                                <i class="fas fa-exclamation-circle text-red-500"></i>
+                                <span class="text-xs text-red-600 font-medium">Breached</span>
+                                {% elif ticket.sla_status == 'at_risk' %}
+                                <i class="fas fa-exclamation-triangle text-yellow-500"></i>
+                                <span class="text-xs text-yellow-600 font-medium">At Risk</span>
+                                {% else %}
+                                <i class="fas fa-check-circle text-green-500"></i>
+                                <span class="text-xs text-green-600">On Track</span>
+                                {% endif %}
+                            </div>
+                            {% else %}
+                            <span class="text-gray-400">-</span>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% else %}
+                    <tr>
+                        <td colspan="7" class="px-6 py-12 text-center text-gray-500">
+                            <div class="flex flex-col items-center">
+                                <i class="fas fa-ticket-alt text-4xl text-gray-300 mb-2"></i>
+                                <p>No tickets found</p>
+                                <a href="{{ url_for('tickets.create') }}" class="mt-2 text-primary-600 hover:text-primary-700">
+                                    Create your first ticket
+                                </a>
+                            </div>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+
+        <!-- Pagination -->
+        {% if tickets.pages > 1 %}
+        <div class="px-6 py-4 border-t border-gray-200 flex items-center justify-between">
+            <div class="text-sm text-gray-500">
+                Showing {{ tickets.items|length }} of {{ tickets.total }} tickets
+            </div>
+            <div class="flex items-center space-x-2">
+                {% if tickets.has_prev %}
+                <a href="{{ url_for('tickets.index', page=tickets.prev_num, **request.args) }}"
+                   class="px-3 py-1 border border-gray-300 rounded text-sm hover:bg-gray-50">
+                    <i class="fas fa-chevron-left"></i>
+                </a>
+                {% endif %}
+
+                {% for page_num in tickets.iter_pages(left_edge=1, right_edge=1, left_current=1, right_current=1) %}
+                    {% if page_num %}
+                        {% if page_num == tickets.page %}
+                        <span class="px-3 py-1 bg-primary-600 text-white rounded text-sm">{{ page_num }}</span>
+                        {% else %}
+                        <a href="{{ url_for('tickets.index', page=page_num, **request.args) }}"
+                           class="px-3 py-1 border border-gray-300 rounded text-sm hover:bg-gray-50">{{ page_num }}</a>
+                        {% endif %}
+                    {% else %}
+                    <span class="px-2">...</span>
+                    {% endif %}
+                {% endfor %}
+
+                {% if tickets.has_next %}
+                <a href="{{ url_for('tickets.index', page=tickets.next_num, **request.args) }}"
+                   class="px-3 py-1 border border-gray-300 rounded text-sm hover:bg-gray-50">
+                    <i class="fas fa-chevron-right"></i>
+                </a>
+                {% endif %}
+            </div>
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

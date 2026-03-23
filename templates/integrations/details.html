@@ -1,0 +1,153 @@
+{% extends "base.html" %}
+
+{% block title %}{{ account.integration.name }} Integration{% endblock %}
+
+{% block content %}
+<div class="space-y-6">
+    <!-- Page Header -->
+    <div class="flex items-center justify-between">
+        <div class="flex items-center space-x-4">
+            <a href="{{ url_for('integrations.index') }}" class="text-gray-500 hover:text-gray-700">
+                <i class="fas fa-arrow-left"></i>
+            </a>
+            <div>
+                <h1 class="text-2xl font-bold text-gray-900">{{ account.integration.name }}</h1>
+                <p class="mt-1 text-sm text-gray-500">
+                    Connected {{ account.created_at|datetime }}
+                </p>
+            </div>
+        </div>
+        <div class="flex items-center space-x-3">
+            <span class="px-3 py-1 text-sm font-medium rounded-full
+                {% if account.status == 'active' %}bg-green-100 text-green-800{% endif %}
+                {% if account.status == 'expired' %}bg-yellow-100 text-yellow-800{% endif %}
+                {% if account.status == 'revoked' %}bg-red-100 text-red-800{% endif %}">
+                {{ account.status|title }}
+            </span>
+            <form action="{{ url_for('integrations.disconnect', account_id=account.id) }}" method="POST"
+                  onsubmit="return confirm('Are you sure you want to disconnect this integration?');">
+                <button type="submit" class="px-4 py-2 border border-red-300 text-red-600 rounded-lg hover:bg-red-50 transition-colors">
+                    <i class="fas fa-unlink mr-2"></i>Disconnect
+                </button>
+            </form>
+        </div>
+    </div>
+
+    <!-- Connection Info -->
+    <div class="bg-white rounded-lg border border-gray-200">
+        <div class="px-6 py-4 border-b border-gray-200">
+            <h2 class="text-lg font-semibold text-gray-900">Connection Details</h2>
+        </div>
+        <div class="p-6">
+            <dl class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                    <dt class="text-sm font-medium text-gray-500">Account Name</dt>
+                    <dd class="mt-1 text-sm text-gray-900">{{ account.account_name or 'N/A' }}</dd>
+                </div>
+                <div>
+                    <dt class="text-sm font-medium text-gray-500">Status</dt>
+                    <dd class="mt-1 text-sm text-gray-900">{{ account.status|title }}</dd>
+                </div>
+                <div>
+                    <dt class="text-sm font-medium text-gray-500">Connected On</dt>
+                    <dd class="mt-1 text-sm text-gray-900">{{ account.created_at|datetime }}</dd>
+                </div>
+                <div>
+                    <dt class="text-sm font-medium text-gray-500">Last Sync</dt>
+                    <dd class="mt-1 text-sm text-gray-900">{{ account.last_sync_at|datetime if account.last_sync_at else 'Never' }}</dd>
+                </div>
+            </dl>
+        </div>
+    </div>
+
+    <!-- Available Actions -->
+    {% if tools %}
+    <div class="bg-white rounded-lg border border-gray-200">
+        <div class="px-6 py-4 border-b border-gray-200">
+            <h2 class="text-lg font-semibold text-gray-900">Available Actions</h2>
+        </div>
+        <div class="divide-y divide-gray-200">
+            {% for tool in tools[:10] %}
+            <div class="px-6 py-4 flex items-center justify-between">
+                <div>
+                    <h3 class="text-sm font-medium text-gray-900">{{ tool.name }}</h3>
+                    <p class="text-sm text-gray-500">{{ tool.description }}</p>
+                </div>
+                <button onclick="executeAction('{{ tool.slug }}')"
+                        class="px-3 py-1.5 bg-primary-100 text-primary-700 text-sm font-medium rounded-lg hover:bg-primary-200 transition-colors">
+                    Execute
+                </button>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Available Triggers -->
+    {% if triggers %}
+    <div class="bg-white rounded-lg border border-gray-200">
+        <div class="px-6 py-4 border-b border-gray-200">
+            <h2 class="text-lg font-semibold text-gray-900">Available Triggers</h2>
+        </div>
+        <div class="divide-y divide-gray-200">
+            {% for trigger in triggers[:10] %}
+            <div class="px-6 py-4 flex items-center justify-between">
+                <div>
+                    <h3 class="text-sm font-medium text-gray-900">{{ trigger.name }}</h3>
+                    <p class="text-sm text-gray-500">{{ trigger.description }}</p>
+                </div>
+                <button onclick="subscribeTrigger('{{ trigger.slug }}')"
+                        class="px-3 py-1.5 bg-gray-100 text-gray-700 text-sm font-medium rounded-lg hover:bg-gray-200 transition-colors">
+                    Subscribe
+                </button>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Recent Events -->
+    <div class="bg-white rounded-lg border border-gray-200">
+        <div class="px-6 py-4 border-b border-gray-200">
+            <h2 class="text-lg font-semibold text-gray-900">Recent Events</h2>
+        </div>
+        {% if events %}
+        <div class="divide-y divide-gray-200">
+            {% for event in events %}
+            <div class="px-6 py-4">
+                <div class="flex items-center justify-between mb-2">
+                    <span class="text-sm font-medium text-gray-900">{{ event.event_type }}</span>
+                    <span class="px-2 py-1 text-xs font-medium rounded-full
+                        {% if event.status == 'processed' %}bg-green-100 text-green-800{% endif %}
+                        {% if event.status == 'pending' %}bg-yellow-100 text-yellow-800{% endif %}
+                        {% if event.status == 'failed' %}bg-red-100 text-red-800{% endif %}">
+                        {{ event.status|title }}
+                    </span>
+                </div>
+                <p class="text-xs text-gray-500">{{ event.created_at|datetime }}</p>
+                {% if event.error_message %}
+                <p class="text-xs text-red-600 mt-1">{{ event.error_message }}</p>
+                {% endif %}
+            </div>
+            {% endfor %}
+        </div>
+        {% else %}
+        <div class="px-6 py-8 text-center text-gray-500">
+            <p>No events yet. Events will appear here when triggers fire.</p>
+        </div>
+        {% endif %}
+    </div>
+</div>
+
+<script>
+function executeAction(actionSlug) {
+    // This would open a modal to collect action parameters
+    alert('Action execution for: ' + actionSlug + '\\n\\nThis would open a form to enter parameters for the action.');
+}
+
+function subscribeTrigger(triggerSlug) {
+    // This would subscribe to the trigger
+    alert('Subscribing to trigger: ' + triggerSlug + '\\n\\nThis would set up a webhook for this trigger.');
+}
+</script>
+{% endblock %}

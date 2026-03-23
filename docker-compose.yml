@@ -1,0 +1,157 @@
+version: '3.8'
+
+services:
+  # Main Application
+  web:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: taskflow-web
+    restart: unless-stopped
+    ports:
+      - "5000:5000"
+    environment:
+      - SECRET_KEY=${SECRET_KEY:-your-secret-key-change-in-production}
+      - DATABASE_URL=postgresql://taskflow:taskflow@db:5432/taskflow
+      - REDIS_URL=redis://redis:6379/0
+      - FLASK_APP=app/main.py
+      - FLASK_ENV=development
+      - DEBUG=True
+      - STRIPE_SECRET_KEY=${STRIPE_SECRET_KEY}
+      - STRIPE_PUBLISHABLE_KEY=${STRIPE_PUBLISHABLE_KEY}
+      - STRIPE_WEBHOOK_SECRET=${STRIPE_WEBHOOK_SECRET}
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - COMPOSIO_API_KEY=${COMPOSIO_API_KEY}
+      - MAIL_SERVER=${MAIL_SERVER:-mailhog}
+      - MAIL_PORT=${MAIL_PORT:-1025}
+      - MAIL_USE_TLS=${MAIL_USE_TLS:-False}
+      - MAIL_USERNAME=${MAIL_USERNAME}
+      - MAIL_PASSWORD=${MAIL_PASSWORD}
+    volumes:
+      - ./app:/app/app
+      - ./templates:/app/templates
+      - ./static:/app/static
+    depends_on:
+      - db
+      - redis
+      - mailhog
+    networks:
+      - taskflow-network
+
+  # PostgreSQL Database
+  db:
+    image: postgres:15-alpine
+    container_name: taskflow-db
+    restart: unless-stopped
+    environment:
+      - POSTGRES_USER=taskflow
+      - POSTGRES_PASSWORD=taskflow
+      - POSTGRES_DB=taskflow
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    networks:
+      - taskflow-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U taskflow"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Redis for Caching and Celery
+  redis:
+    image: redis:7-alpine
+    container_name: taskflow-redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    networks:
+      - taskflow-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Celery Worker for Background Tasks
+  celery-worker:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: taskflow-celery
+    restart: unless-stopped
+    command: celery -A app.celery_app worker --loglevel=info
+    environment:
+      - SECRET_KEY=${SECRET_KEY:-your-secret-key-change-in-production}
+      - DATABASE_URL=postgresql://taskflow:taskflow@db:5432/taskflow
+      - REDIS_URL=redis://redis:6379/0
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - COMPOSIO_API_KEY=${COMPOSIO_API_KEY}
+    volumes:
+      - ./app:/app/app
+    depends_on:
+      - db
+      - redis
+    networks:
+      - taskflow-network
+
+  # Celery Beat for Scheduled Tasks
+  celery-beat:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: taskflow-celery-beat
+    restart: unless-stopped
+    command: celery -A app.celery_app beat --loglevel=info
+    environment:
+      - SECRET_KEY=${SECRET_KEY:-your-secret-key-change-in-production}
+      - DATABASE_URL=postgresql://taskflow:taskflow@db:5432/taskflow
+      - REDIS_URL=redis://redis:6379/0
+    volumes:
+      - ./app:/app/app
+    depends_on:
+      - db
+      - redis
+    networks:
+      - taskflow-network
+
+  # Mailhog for Email Testing
+  mailhog:
+    image: mailhog/mailhog:latest
+    container_name: taskflow-mailhog
+    restart: unless-stopped
+    ports:
+      - "1025:1025"  # SMTP
+      - "8025:8025"  # Web UI
+    networks:
+      - taskflow-network
+
+  # Nginx Reverse Proxy (Production)
+  nginx:
+    image: nginx:alpine
+    container_name: taskflow-nginx
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./static:/app/static:ro
+      - ./certs:/etc/nginx/certs:ro
+    depends_on:
+      - web
+    networks:
+      - taskflow-network
+    profiles:
+      - production
+
+volumes:
+  postgres_data:
+  redis_data:
+
+networks:
+  taskflow-network:
+    driver: bridge

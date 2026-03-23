@@ -1,0 +1,203 @@
+{% extends "base.html" %}
+
+{% block title %}Notification Rules - Admin{% endblock %}
+
+{% block content %}
+<div class="space-y-6">
+    <!-- Page Header -->
+    <div class="flex items-center justify-between">
+        <div>
+            <h1 class="text-2xl font-bold text-gray-900">Notification Rules</h1>
+            <p class="mt-1 text-sm text-gray-500">Manage automated alerts and notifications</p>
+        </div>
+        <a href="{{ url_for('notifications.create_rule') }}" class="inline-flex items-center px-4 py-2 bg-primary-600 text-white text-sm font-medium rounded-lg hover:bg-primary-700">
+            <i class="fas fa-plus mr-2"></i>
+            New Rule
+        </a>
+    </div>
+
+    <!-- Stats -->
+    <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+        <div class="bg-white rounded-lg border border-gray-200 p-4">
+            <div class="flex items-center justify-between">
+                <div>
+                    <p class="text-sm text-gray-500">Total Rules</p>
+                    <p class="text-2xl font-bold text-gray-900">{{ stats.total_rules }}</p>
+                </div>
+                <div class="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center">
+                    <i class="fas fa-bell text-blue-600"></i>
+                </div>
+            </div>
+        </div>
+        <div class="bg-white rounded-lg border border-gray-200 p-4">
+            <div class="flex items-center justify-between">
+                <div>
+                    <p class="text-sm text-gray-500">Active Rules</p>
+                    <p class="text-2xl font-bold text-gray-900">{{ stats.active_rules }}</p>
+                </div>
+                <div class="w-10 h-10 bg-green-100 rounded-lg flex items-center justify-center">
+                    <i class="fas fa-check-circle text-green-600"></i>
+                </div>
+            </div>
+        </div>
+        <div class="bg-white rounded-lg border border-gray-200 p-4">
+            <div class="flex items-center justify-between">
+                <div>
+                    <p class="text-sm text-gray-500">Notifications Sent</p>
+                    <p class="text-2xl font-bold text-gray-900">{{ stats.notifications_sent }}</p>
+                </div>
+                <div class="w-10 h-10 bg-purple-100 rounded-lg flex items-center justify-center">
+                    <i class="fas fa-paper-plane text-purple-600"></i>
+                </div>
+            </div>
+        </div>
+        <div class="bg-white rounded-lg border border-gray-200 p-4">
+            <div class="flex items-center justify-between">
+                <div>
+                    <p class="text-sm text-gray-500">Failed</p>
+                    <p class="text-2xl font-bold text-gray-900">{{ stats.failed_notifications }}</p>
+                </div>
+                <div class="w-10 h-10 bg-red-100 rounded-lg flex items-center justify-center">
+                    <i class="fas fa-exclamation-triangle text-red-600"></i>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Notification Rules -->
+    <div class="bg-white rounded-lg border border-gray-200">
+        <div class="px-6 py-4 border-b border-gray-200">
+            <h2 class="text-lg font-semibold text-gray-900">Active Rules</h2>
+        </div>
+        {% if rules %}
+        <div class="divide-y divide-gray-200">
+            {% for rule in rules %}
+            <div class="px-6 py-4 flex items-center justify-between">
+                <div class="flex items-center space-x-4">
+                    <div class="w-10 h-10 rounded-lg flex items-center justify-center
+                        {% if rule.is_active %}bg-green-100{% else %}bg-gray-100{% endif %}">
+                        <i class="fas fa-bell {% if rule.is_active %}text-green-600{% else %}text-gray-400{% endif %}"></i>
+                    </div>
+                    <div>
+                        <h3 class="text-sm font-medium text-gray-900">{{ rule.name }}</h3>
+                        <p class="text-xs text-gray-500">
+                            Trigger: {{ rule.trigger_type.replace('_', ' ').title() }}
+                            &middot; Channels: {{ rule.channels|length }}
+                        </p>
+                    </div>
+                </div>
+                <div class="flex items-center space-x-3">
+                    <span class="text-xs text-gray-500">
+                        Triggered {{ rule.trigger_count }} times
+                        {% if rule.last_triggered_at %}
+                        &middot; Last: {{ rule.last_triggered_at|date }}
+                        {% endif %}
+                    </span>
+                    <span class="px-2 py-1 text-xs font-medium rounded-full
+                        {% if rule.is_active %}bg-green-100 text-green-800{% else %}bg-gray-100 text-gray-800{% endif %}">
+                        {{ 'Active' if rule.is_active else 'Inactive' }}
+                    </span>
+                    <a href="{{ url_for('notifications.edit_rule', rule_id=rule.id) }}"
+                       class="text-primary-600 hover:text-primary-700">
+                        <i class="fas fa-edit"></i>
+                    </a>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+        {% else %}
+        <div class="px-6 py-8 text-center text-gray-500">
+            <i class="fas fa-bell-slash text-4xl mb-2"></i>
+            <p>No notification rules configured</p>
+            <a href="{{ url_for('notifications.create_rule') }}" class="text-primary-600 hover:text-primary-700 mt-2 inline-block">
+                Create your first rule
+            </a>
+        </div>
+        {% endif %}
+    </div>
+
+    <!-- Recent Notification Logs -->
+    <div class="bg-white rounded-lg border border-gray-200">
+        <div class="px-6 py-4 border-b border-gray-200 flex items-center justify-between">
+            <h2 class="text-lg font-semibold text-gray-900">Recent Notifications</h2>
+            <a href="{{ url_for('notifications.logs') }}" class="text-sm text-primary-600 hover:text-primary-700">
+                View All
+            </a>
+        </div>
+        {% if recent_logs %}
+        <div class="divide-y divide-gray-200">
+            {% for log in recent_logs %}
+            <div class="px-6 py-3 flex items-center justify-between">
+                <div class="flex items-center space-x-3">
+                    <div class="w-8 h-8 rounded-full flex items-center justify-center
+                        {% if log.status == 'sent' %}bg-green-100{% elif log.status == 'failed' %}bg-red-100{% else %}bg-yellow-100{% endif %}">
+                        <i class="fas
+                            {% if log.channel == 'slack' %}fa-slack
+                            {% elif log.channel == 'email' %}fa-envelope
+                            {% elif log.channel == 'teams' %}fa-microsoft
+                            {% else %}fa-paper-plane{% endif %}
+                            {% if log.status == 'sent' %}text-green-600{% elif log.status == 'failed' %}text-red-600{% else %}text-yellow-600{% endif %}">
+                        </i>
+                    </div>
+                    <div>
+                        <p class="text-sm font-medium text-gray-900">{{ log.subject or log.trigger_type }}</p>
+                        <p class="text-xs text-gray-500">
+                            {{ log.channel|title }} to {{ log.recipient }}
+                            &middot; {{ log.created_at|datetime }}
+                        </p>
+                    </div>
+                </div>
+                <span class="px-2 py-1 text-xs font-medium rounded-full
+                    {% if log.status == 'sent' %}bg-green-100 text-green-800
+                    {% elif log.status == 'failed' %}bg-red-100 text-red-800
+                    {% else %}bg-yellow-100 text-yellow-800{% endif %}">
+                    {{ log.status|title }}
+                </span>
+            </div>
+            {% endfor %}
+        </div>
+        {% else %}
+        <div class="px-6 py-8 text-center text-gray-500">
+            <p>No recent notifications</p>
+        </div>
+        {% endif %}
+    </div>
+
+    <!-- Quick Setup Templates -->
+    <div class="bg-white rounded-lg border border-gray-200 p-6">
+        <h2 class="text-lg font-semibold text-gray-900 mb-4">Quick Setup Templates</h2>
+        <div class="grid md:grid-cols-3 gap-4">
+            <a href="{{ url_for('notifications.create_rule') }}?template=critical_ticket"
+               class="block p-4 border border-gray-200 rounded-lg hover:border-primary-500 hover:shadow-sm transition-colors">
+                <div class="flex items-center space-x-3 mb-2">
+                    <div class="w-10 h-10 bg-red-100 rounded-lg flex items-center justify-center">
+                        <i class="fas fa-exclamation-circle text-red-600"></i>
+                    </div>
+                    <h3 class="font-medium text-gray-900">Critical Ticket Alert</h3>
+                </div>
+                <p class="text-xs text-gray-500">Get notified when a critical priority ticket is created</p>
+            </a>
+            <a href="{{ url_for('notifications.create_rule') }}?template=sla_breach"
+               class="block p-4 border border-gray-200 rounded-lg hover:border-primary-500 hover:shadow-sm transition-colors">
+                <div class="flex items-center space-x-3 mb-2">
+                    <div class="w-10 h-10 bg-yellow-100 rounded-lg flex items-center justify-center">
+                        <i class="fas fa-clock text-yellow-600"></i>
+                    </div>
+                    <h3 class="font-medium text-gray-900">SLA Breach Warning</h3>
+                </div>
+                <p class="text-xs text-gray-500">Alert when tickets are approaching SLA deadline</p>
+            </a>
+            <a href="{{ url_for('notifications.create_rule') }}?template=deal_won"
+               class="block p-4 border border-gray-200 rounded-lg hover:border-primary-500 hover:shadow-sm transition-colors">
+                <div class="flex items-center space-x-3 mb-2">
+                    <div class="w-10 h-10 bg-green-100 rounded-lg flex items-center justify-center">
+                        <i class="fas fa-trophy text-green-600"></i>
+                    </div>
+                    <h3 class="font-medium text-gray-900">Deal Won Celebration</h3>
+                </div>
+                <p class="text-xs text-gray-500">Celebrate when opportunities are won</p>
+            </a>
+        </div>
+    </div>
+</div>
+{% endblock %}
