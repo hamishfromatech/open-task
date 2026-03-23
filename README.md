@@ -3,13 +3,13 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Python 3.11+](https://img.shields.io/badge/python-3.11+-blue.svg)](https://www.python.org/downloads/)
 [![Flask](https://img.shields.io/badge/Flask-3.0.0-red.svg)](https://palletsprojects.com/p/flask/)
+[![Docker](https://img.shields.io/badge/Docker-ready-success)](https://www.docker.com/)
 
 Professional Services Automation (PSA) Platform - A comprehensive, AI-powered alternative to Autotask, built with Flask and modern technologies.
 
 ![TaskFlow Dashboard](https://img.shields.io/badge/Dashboard-Interactive-success)
 ![Ticketing](https://img.shields.io/badge/Ticketing-ITIL--aligned-blue)
 ![CRM](https://img.shields.io/badge/CRM-Sales--pipeline-green)
-![Billing](https://img.shields.io/badge/Billing-Stripe-powered-orange)
 
 ## 🌟 Features
 
@@ -69,6 +69,15 @@ Professional Services Automation (PSA) Platform - A comprehensive, AI-powered al
 - **Support**: Zendesk, Freshdesk
 - **Auto-auth configuration** - Connect integrations with a single click
 
+### 🔔 Notification System
+- Real-time notifications via websockets
+- Customizable notification rules and triggers
+- Email notifications for critical events
+- Push notifications to connected integrations (Slack, Teams)
+- Notification preferences per user
+- Notification history and tracking
+- SLA breach warnings and alerts
+
 ### ⚙️ Workflow Automation
 - Trigger-based automated actions
 - Custom workflow rules
@@ -107,13 +116,154 @@ Professional Services Automation (PSA) Platform - A comprehensive, AI-powered al
 - **Monitoring**: Health checks, logging
 
 ### Third-Party Services
-- **AI**: OpenAI GPT-4 Turbo
+- **AI**: OpenAI Compatible with Ollama, LM Studio, Llama.cpp and vLLM.
 - **Payments**: Stripe
 - **Integrations**: Composio Dev (850+ apps)
 
+
 ## 🚀 Quick Start
 
-### Option 1: Docker (Recommended for Production)
+### Option 1: Docker (Recommended for All Environments)
+
+1. **Clone the repository**
+   ```bash
+   git clone https://github.com/hamishfromatech/taskflow-psa.git
+   cd taskflow-psa
+   ```
+
+2. **Configure environment variables**
+   ```bash
+   cp .env.example .env
+   # Edit .env with your configuration
+   ```
+
+3. **Start all services**
+   ```bash
+   docker-compose up -d
+   ```
+
+4. **Initialize the database**
+   ```bash
+   docker-compose exec web python init_db.py
+   ```
+
+5. **Access the application**
+   - Web interface: http://localhost:5000
+   - Mailhog (email testing): http://localhost:8025
+
+**Default credentials:**
+
+### Option 2: Manual Installation (Development)
+
+1. **Prerequisites**
+   - Python 3.11+
+   - PostgreSQL 15+
+   - Redis (for Celery)
+   - SMTP server or Mailhog
+
+2. **Clone and setup**
+   ```bash
+   git clone https://github.com/hamishfromatech/taskflow-psa.git
+   cd taskflow-psa
+   python -m venv venv
+   source venv/bin/activate  # On Windows: venv\Scripts\activate
+   ```
+
+3. **Install dependencies**
+   ```bash
+   pip install -r requirements.txt
+   ```
+
+4. **Configure environment**
+   ```bash
+   cp .env.example .env
+   # Edit .env with your configuration
+   ```
+
+5. **Environment Variables**
+
+| Variable | Description | Required |
+|----------|-------------|----------|
+| `FLASK_APP` | Application entry point | Yes |
+| `FLASK_ENV` | Environment (development/production) | Yes |
+| `SECRET_KEY` | Flask secret key for sessions | Yes |
+| `SQLALCHEMY_DATABASE_URI` | PostgreSQL connection string | Yes |
+| `REDIS_URL` | Redis connection string | Yes |
+| `OPENAI_API_KEY` | OpenAI API key for AI Assistant | Yes |
+| `STRIPE_SECRET_KEY` | Stripe API secret key | Yes |
+| `STRIPE_PUBLISHABLE_KEY` | Stripe publishable key | Yes |
+| `COMPOSIO_API_KEY` | Composio API key | Yes |
+| `SMTP_SERVER` | SMTP server address | Yes |
+| `SMTP_PORT` | SMTP server port | Yes |
+| `SMTP_USER` | SMTP username | Yes |
+| `SMTP_PASSWORD` | SMTP password | Yes |
+| `SMTP_FROM_EMAIL` | Default from email | Yes |
+
+### Example `.env` File
+
+See `.env.example` for a complete template with all available options:
+
+```env
+# Flask Configuration
+SECRET_KEY=your-secret-key-change-in-production
+FLASK_APP=app/main.py
+FLASK_ENV=development
+DEBUG=True
+
+# Database
+DATABASE_URL=postgresql://taskflow:taskflow@db:5432/taskflow
+
+# Redis
+REDIS_URL=redis://redis:6379/0
+
+# Stripe Configuration
+STRIPE_SECRET_KEY=sk_test_your-stripe-secret-key
+STRIPE_PUBLISHABLE_KEY=pk_test_your-stripe-publishable-key
+STRIPE_WEBHOOK_SECRET=whsec_your-webhook-secret
+
+# OpenAI Configuration
+OPENAI_API_KEY=sk-your-openai-api-key
+OPENAI_MODEL=gpt-4-turbo-preview
+
+# SMTP Configuration
+MAIL_SERVER=smtp.gmail.com
+MAIL_PORT=587
+MAIL_USE_TLS=True
+MAIL_USERNAME=your-email@gmail.com
+MAIL_PASSWORD=your-app-password
+MAIL_DEFAULT_SENDER=noreply@taskflow.com
+
+# Application Settings
+APP_NAME=TaskFlow PSA
+APP_URL=http://localhost:5000
+SUPPORT_EMAIL=support@taskflow.com
+
+# Feature Flags
+ENABLE_AI_FEATURES=True
+ENABLE_INTEGRATIONS=True
+```
+
+6. **Initialize the database**
+   ```bash
+   python init_db.py
+   ```
+
+6. **Start the application**
+   ```bash
+   python run.py
+   ```
+
+7. **Start Celery worker** (in separate terminal)
+   ```bash
+   celery -A app.celery_app.celery worker --loglevel=info
+   ```
+
+8. **Start Celery beat** (for scheduled tasks)
+   ```bash
+   celery -A app.celery_app.celery beat --loglevel=info
+   ```
+
+**Default credentials:**
 
 1. **Clone the repository**
    ```bash
@@ -282,9 +432,75 @@ autotask/
 └── README.md                    # This file
 ```
 
+## 🔧 Database Migrations
+
+The application uses Flask-Migrate with Alembic for database schema management.
+
+### Common Migration Commands
+
+```bash
+# Generate a new migration
+flask db migrate -m "Description of changes"
+
+# Review the generated migration
+# Check migrations/versions/ folder
+
+# Apply migrations to the database
+flask db upgrade
+
+# Rollback to previous migration
+flask db downgrade
+
+# View current migration status
+flask db current
+
+# View migration history
+flask db history
+```
+
+### When to Run Migrations
+- After changing model definitions in `app/models/`
+- When adding new models
+- When modifying relationships between models
+
 ## 🔌 API Documentation
 
 The REST API is available at `/api/` prefix. All endpoints require authentication via Flask-Login or API key.
+
+### Authentication
+
+- **Session Authentication**: Use Flask-Login session (for web interface)
+- **API Key Authentication**: Include `X-API-Key` header with your API key
+- **Obtain API Key**: Generate in `/settings/api` after logging in
+
+### Error Responses
+
+| Status Code | Description |
+|-------------|-------------|
+| 401 | Unauthorized - Invalid or missing authentication |
+| 403 | Forbidden - Insufficient permissions |
+| 404 | Not Found - Resource does not exist |
+| 422 | Validation Error - Invalid request data |
+| 500 | Internal Server Error |
+
+### Notifications API
+
+- `GET /api/notifications` - Get user notifications with pagination
+- `GET /api/notifications/unread` - Get unread notifications count
+- `PUT /api/notifications/<id>/read` - Mark notification as read
+- `PUT /api/notifications/read-all` - Mark all notifications as read
+- `DELETE /api/notifications/<id>` - Delete a notification
+
+### Webhooks
+
+The system supports webhooks for external integration:
+
+- **Ticket Events**: created, updated, status_changed, assigned, resolved
+- **Project Events**: created, updated, completed
+- **CRM Events**: lead_created, opportunity_won, client_updated
+- **Billing Events**: invoice_created, invoice_paid, payment_received
+
+Configure webhooks in the admin panel or via the `/api/webhooks` endpoint.
 
 ### Available Endpoints
 
@@ -313,6 +529,8 @@ The REST API is available at `/api/` prefix. All endpoints require authenticatio
 
 ## 🧪 Testing
 
+### Running Tests
+
 ```bash
 # Run all tests
 pytest
@@ -322,6 +540,47 @@ pytest --cov=app --cov-report=html
 
 # Run linter
 flake8 app/
+
+# Run specific test file
+pytest tests/test_features.py
+
+# Run with verbose output
+pytest -v
+
+# Run tests matching a pattern
+pytest -k "ticket or project"
+```
+
+### Test Coverage
+
+The application maintains high test coverage for critical functionality:
+
+| Module | Coverage Goal | Status |
+|--------|--------------|--------|
+| `app/models/` | 90% | ✅ |
+| `app/api/` | 85% | ✅ |
+| `app/auth/` | 95% | ✅ |
+| `app/ai_assistant/` | 80% | 🔄 |
+| `app/integrations/` | 75% | 🔄 |
+
+### Writing Tests
+
+- Use Pytest framework
+- Follow arrange-act-assert pattern
+- Mock external dependencies
+- Test both happy paths and edge cases
+- Use fixtures for test data
+
+```python
+# Example test
+def test_create_ticket():
+    client = app.test_client()
+    response = client.post('/api/tickets', json={
+        'title': 'Test Ticket',
+        'description': 'Test description'
+    })
+    assert response.status_code == 201
+    assert response.json['title'] == 'Test Ticket'
 ```
 
 ## 📊 Database Models
@@ -357,6 +616,11 @@ flake8 app/
 - **Payment** - Payment records
 - **Subscription** - Recurring subscriptions
 
+### Notifications
+- **NotificationRule** - Custom notification rules and triggers
+- **NotificationLog** - Notification delivery history
+- **NotificationPreference** - User notification preferences
+
 ### Integrations
 - **Integration** - Integration definitions
 - **ConnectedAccount** - User-connected accounts
@@ -366,7 +630,91 @@ flake8 app/
 - **Workflow** - Workflow definitions
 - **WorkflowExecution** - Workflow execution history
 
-## 🐳 Docker Services
+## 👨‍💼 Admin Panel
+
+The admin panel (`/admin`) provides system-level management capabilities:
+
+### User Management
+- Create, edit, and delete users
+- Assign roles and permissions
+- View user activity logs
+- Reset user passwords
+- Enable/disable accounts
+
+### Organization Management
+- Create and configure organizations
+- Set organization-wide settings
+- Manage organization-level integrations
+- Monitor resource usage
+
+### Integration Management
+- Configure integration credentials
+- Enable/disable integrations
+- View integration status and logs
+- Manage connected accounts
+
+### Notification Rules
+- Create custom notification rules
+- Configure trigger conditions
+- Set notification channels (email, Slack, Teams)
+- Test notification rules
+
+### System Settings
+- Email configuration
+- SMTP settings
+- AI model configuration
+- SLA policy settings
+- Invoice and billing settings
+
+## 🔧 Troubleshooting
+
+### Common Issues
+
+#### Docker Issues
+
+**Issue**: Container won't start
+- Solution: Check logs with `docker-compose logs web`
+
+**Issue**: Database connection failed
+- Solution: Ensure PostgreSQL is running: `docker-compose ps db`
+
+**Issue**: Port already in use
+- Solution: Change port in `.env` or stop conflicting service
+
+#### Application Issues
+
+**Issue**: Login fails but user exists
+- Solution: Reset password via admin panel or CLI
+
+**Issue**: AI Assistant not responding
+- Solution: Check OpenAI API key in `.env` and ensure credits are available
+
+**Issue**: Email not sending
+- Solution: Verify SMTP settings in `.env` and test with Mailhog UI
+
+**Issue**: Celery tasks not running
+- Solution: Ensure Celery worker is running: `docker-compose up celery-worker`
+
+### Useful Commands
+
+```bash
+# View application logs
+docker-compose logs -f web
+
+# Restart specific service
+docker-compose restart redis
+
+# Access database
+docker-compose exec db psql -U taskflow -d taskflow
+
+# Run database migration
+docker-compose exec web flask db upgrade
+
+# View Celery logs
+docker-compose logs -f celery-worker
+```
+
+## 🔒 Security Features
 
 | Service | Port | Description |
 |---------|------|-------------|
@@ -389,6 +737,35 @@ flake8 app/
 - API key authentication for REST API
 - Secure email configuration
 
+## 🤝 Contributing
+
+Contributions are welcome! Here's how you can help:
+
+### Ways to Contribute
+- **Bug Reports**: Open an issue with detailed reproduction steps
+- **Feature Requests**: Suggest new features or improvements
+- **Code Contributions**: Fix bugs or implement new features
+- **Documentation**: Improve documentation or add examples
+- **Translations**: Help localize the application
+
+### Development Setup
+
+1. Fork the repository
+2. Create a feature branch (`git checkout -b feature/amazing-feature`)
+3. Make your changes
+4. Run tests (`pytest`)
+5. Run linter (`flake8 app/`)
+6. Commit your changes (`git commit -m 'Add some amazing feature'`)
+7. Push to your branch (`git push origin feature/amazing-feature`)
+8. Open a Pull Request
+
+### Code Style
+- Follow [PEP 8](https://peps.python.org/pep-0008/) style guidelines
+- Use type hints where possible
+- Write clear commit messages
+- Add tests for new functionality
+- Update documentation as needed
+
 ## 📝 License
 
 MIT License - See [LICENSE](LICENSE) file for details.
@@ -399,7 +776,7 @@ MIT License - See [LICENSE](LICENSE) file for details.
 
 - Website: https://theatechcorporation.com
 - GitHub: [@hamishfromatech](https://github.com/hamishfromatech)
-- Support: hamish<!-- Import failed: atech.industries. - Only .md files are supported -->
+- Support: hamish@atech.industries
 
 ## 🙏 Acknowledgments
 
@@ -414,11 +791,8 @@ For support, please:
 1. Check the [documentation](https://docs.taskflow.local)
 2. Search existing [issues](https://github.com/hamishfromatech/taskflow-psa/issues)
 3. Open a new issue with detailed information
-4. Contact: hamish<!-- Import failed: atech.industries. - Only .md files are supported -->
+4. Contact: hamish@atech.industries
 
-## 🔄 Changelog
-
-See [CHANGELOG.md](CHANGELOG.md) for version history and release notes.
 
 ---
 
